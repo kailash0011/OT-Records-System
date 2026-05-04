@@ -1,0 +1,179 @@
+/* ============================================================
+   OT Records Management System – Application Stylesheet
+   Version: 1.0.0
+   ============================================================ */
+
+/* ---- Variables ------------------------------------------ */
+:root {
+    --sidebar-width:        240px;
+    --sidebar-bg:           #1e2a38;
+    --sidebar-hover-bg:     rgba(255,255,255,.08);
+    --sidebar-active-bg:    rgba(13,110,253,.35);
+    --topbar-height:        56px;
+    --card-radius:          .75rem;
+    --transition-speed:     .2s;
+}
+
+/* ---- Layout --------------------------------------------- */
+#wrapper {
+    min-height: 100vh;
+}
+
+/* Sidebar */
+#sidebar {
+    width: var(--sidebar-width);
+    min-height: 100vh;
+    background-color: var(--sidebar-bg);
+    transition: width var(--transition-speed) ease;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-shrink: 0;
+}
+
+#sidebar .nav-link {
+    color: rgba(255,255,255,.75);
+    border-radius: .4rem;
+    padding: .45rem .75rem;
+    margin-bottom: 2px;
+    font-size: .875rem;
+    transition: background var(--transition-speed), color var(--transition-speed);
+    white-space: nowrap;
+}
+#sidebar .nav-link:hover {
+    background-color: var(--sidebar-hover-bg);
+    color: #fff;
+}
+#sidebar .nav-link.active {
+    background-color: var(--sidebar-active-bg);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Sidebar sub-menu items */
+#sidebar ul.collapse .nav-link {
+    font-size: .82rem;
+    padding-left: 1.5rem;
+}
+
+/* Main content wrapper */
+#page-content-wrapper {
+    transition: margin-left var(--transition-speed) ease;
+    min-width: 0;
+}
+
+/* ---- Cards ---------------------------------------------- */
+.card {
+    border-radius: var(--card-radius);
+}
+.card-header {
+    border-bottom: none;
+}
+
+/* Stat cards icon circles */
+.rounded-circle.bg-primary.bg-opacity-10 { background-color: rgba(13,110,253,.12) !important; }
+.rounded-circle.bg-success.bg-opacity-10 { background-color: rgba(25,135,84,.12)  !important; }
+.rounded-circle.bg-info.bg-opacity-10    { background-color: rgba(13,202,240,.12) !important; }
+.rounded-circle.bg-warning.bg-opacity-10 { background-color: rgba(255,193,7,.12)  !important; }
+.rounded-circle.bg-danger.bg-opacity-10  { background-color: rgba(220,53,69,.12)  !important; }
+
+/* ---- Tables --------------------------------------------- */
+.table thead th {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    white-space: nowrap;
+}
+.table-sm td, .table-sm th {
+    padding: .4rem .6rem;
+    font-size: .875rem;
+}
+
+/* ---- Badges --------------------------------------------- */
+.badge {
+    font-size: .75em;
+    font-weight: 600;
+    letter-spacing: .03em;
+}
+
+/* ---- Forms ---------------------------------------------- */
+.form-label { font-weight: 600; font-size: .875rem; }
+.form-control, .form-select, .input-group-text {
+    font-size: .875rem;
+}
+.required-mark::after { content: ' *'; color: #dc3545; }
+
+/* ---- Alerts --------------------------------------------- */
+.alert { font-size: .875rem; }
+
+/* ---- Dark mode ------------------------------------------ */
+[data-bs-theme="dark"] {
+    --bs-body-bg:   #1a1d21;
+    --bs-body-color: #dee2e6;
+}
+[data-bs-theme="dark"] #sidebar {
+    background-color: #111518;
+}
+[data-bs-theme="dark"] .card {
+    background-color: #212529;
+    border-color: #373b3e;
+}
+[data-bs-theme="dark"] .table {
+    --bs-table-bg: transparent;
+}
+[data-bs-theme="dark"] .navbar {
+    background-color: #212529 !important;
+    border-color: #373b3e !important;
+}
+
+/* ---- Utilities ------------------------------------------ */
+.cursor-pointer { cursor: pointer; }
+.fs-7 { font-size: .8rem; }
+.border-radius-lg { border-radius: var(--card-radius); }
+
+/* ---- Login page ----------------------------------------- */
+.login-card { animation: fadeInUp .4s ease both; }
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ---- DataTables overrides ------------------------------- */
+.dataTables_wrapper .dataTables_filter input {
+    border-radius: .4rem;
+    padding: .3rem .6rem;
+    font-size: .875rem;
+}
+.dataTables_wrapper .dataTables_length select {
+    padding: .3rem .6rem;
+    font-size: .875rem;
+}
+
+/* ---- Select2 overrides ---------------------------------- */
+.select2-container--bootstrap-5 .select2-selection {
+    font-size: .875rem;
+}
+
+/* ---- Print styles --------------------------------------- */
+@media print {
+    #sidebar,
+    .navbar,
+    .btn,
+    .no-print { display: none !important; }
+    #page-content-wrapper { margin: 0 !important; }
+    .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+}
+
+/* ---- Responsive ----------------------------------------- */
+@media (max-width: 767.98px) {
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1045;
+        height: 100vh;
+        display: none;
+    }
+    #sidebar.show {
+        display: flex !important;
+    }
+}
