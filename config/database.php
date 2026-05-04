@@ -2,6 +2,10 @@
 /**
  * Database Configuration
  * OT Records Management System
+ *
+ * IMPORTANT: Before deploying to production, replace the credentials below
+ * with a dedicated database user (not root) and a strong password, or load
+ * them from environment variables using getenv() / $_ENV.
  */
 
 define('DB_HOST',    'localhost');

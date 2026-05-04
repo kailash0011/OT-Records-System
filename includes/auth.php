@@ -232,5 +232,6 @@ function hasPermission(string $module, string $action): bool {
         return false;
     }
 
-    return in_array($action, PERMISSIONS[$module][$role] ?? [], true);
+    return isset(PERMISSIONS[$module][$role])
+        && in_array($action, PERMISSIONS[$module][$role], true);
 }
