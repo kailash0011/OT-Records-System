@@ -76,7 +76,7 @@ $todaySchedule = $stmtSchedule->fetchAll();
 // Recent OT records
 // -------------------------------------------------------
 $stmtRecent = $pdo->prepare(
-    "SELECT ot.record_number, ot.operation_date, ot.procedure_performed,
+    "SELECT ot.id, ot.record_number, ot.operation_date, ot.procedure_performed,
             ot.outcome, ot.start_time, ot.end_time,
             p.full_name AS patient_name,
             s.full_name AS surgeon_name,
@@ -369,7 +369,7 @@ require_once __DIR__ . '/includes/header.php';
                             <?php foreach ($recentRecords as $rec): ?>
                             <tr>
                                 <td>
-                                    <a href="record_view.php?id=<?= urlencode($rec['record_number']) ?>" class="text-decoration-none fw-semibold">
+                                    <a href="<?= BASE_URL ?>modules/records/view.php?id=<?= (int)$rec['id'] ?>" class="text-decoration-none fw-semibold">
                                         <?= htmlspecialchars($rec['record_number'], ENT_QUOTES, 'UTF-8') ?>
                                     </a>
                                 </td>

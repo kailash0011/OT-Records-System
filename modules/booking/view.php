@@ -49,6 +49,11 @@ require_once __DIR__ . '/../../includes/header.php';
             <i class="fas fa-eye me-2 text-info"></i>Booking: <?= sanitize($b['booking_number']) ?>
         </span>
         <div class="ms-auto d-flex gap-2">
+            <?php if ($b['status'] !== 'Completed' && $b['status'] !== 'Cancelled' && hasPermission('ot_records','create')): ?>
+            <a href="<?= BASE_URL ?>modules/records/add.php?booking_id=<?= $id ?>" class="btn btn-success btn-sm">
+                <i class="fas fa-file-medical-alt me-1"></i>Create OT Record
+            </a>
+            <?php endif; ?>
             <?php if (hasPermission('case_bookings','edit')): ?>
             <a href="<?= BASE_URL ?>modules/booking/edit.php?id=<?= $id ?>" class="btn btn-warning btn-sm">
                 <i class="fas fa-edit me-1"></i>Edit

@@ -1,26 +1,15 @@
 <?php
 /**
- * OT Records List – stub page (to be implemented)
+ * OT Records List – forwards to the records module.
  * OT Records Management System
  */
 require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/includes/auth.php';
 requireLogin();
-$pageTitle = 'OT Records List';
-require_once __DIR__ . '/includes/header.php';
-?>
-<div class="d-flex" id="wrapper">
-<?php require_once __DIR__ . '/includes/sidebar.php'; ?>
-<div id="page-content-wrapper" class="flex-grow-1 p-4">
-  <div class="alert alert-info d-flex align-items-center gap-3">
-    <i class="fas fa-tools fa-2x"></i>
-    <div>
-      <strong>OT Records List</strong><br>
-      <span class="small">This module is under construction and will be available in a future release.</span>
-    </div>
-  </div>
-  <a href="dashboard.php" class="btn btn-primary btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to Dashboard</a>
-</div>
-</div>
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+
+$qs = $_SERVER['QUERY_STRING'] ?? '';
+$target = BASE_URL . 'modules/records/index.php' . ($qs ? '?' . $qs : '');
+header('Location: ' . $target);
+exit;
+

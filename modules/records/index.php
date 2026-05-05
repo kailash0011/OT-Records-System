@@ -53,7 +53,7 @@ require_once __DIR__ . '/../../includes/header.php';
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom px-3 py-2">
         <span class="navbar-brand mb-0 h6 fw-bold"><i class="fas fa-file-medical me-2 text-success"></i>OT Records</span>
         <div class="ms-auto">
-            <a href="<?= BASE_URL ?>record_new.php" class="btn btn-success btn-sm">
+            <a href="<?= BASE_URL ?>modules/records/add.php" class="btn btn-success btn-sm">
                 <i class="fas fa-plus me-1"></i>New Record
             </a>
         </div>
@@ -95,7 +95,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <button type="submit" class="btn btn-primary btn-sm flex-fill">
                             <i class="fas fa-search me-1"></i>Filter
                         </button>
-                        <a href="<?= BASE_URL ?>records_list.php" class="btn btn-outline-secondary btn-sm">
+                        <a href="<?= BASE_URL ?>modules/records/index.php" class="btn btn-outline-secondary btn-sm">
                             <i class="fas fa-times"></i>
                         </a>
                     </div>
