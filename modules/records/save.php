@@ -59,6 +59,13 @@ $woundClass        = trim(    $_POST['wound_classification'] ?? 'Clean');
 $outcome           = trim(    $_POST['outcome']              ?? 'Satisfactory');
 $icuRequired       = isset($_POST['icu_required']) ? 1 : 0;
 
+// Case types
+$caseTypeEchs      = isset($_POST['case_type_echs'])  ? 1 : 0;
+$caseTypeSsf       = isset($_POST['case_type_ssf'])   ? 1 : 0;
+$caseTypeMlc       = isset($_POST['case_type_mlc'])   ? 1 : 0;
+$caseTypeOther     = isset($_POST['case_type_other']) ? 1 : 0;
+$caseTypeOtherText = trim($_POST['case_type_other_text'] ?? '');
+
 // Dynamic rows
 $transfusions      = $_POST['transfusions']  ?? [];
 $catheters         = $_POST['catheters']     ?? [];
@@ -98,40 +105,49 @@ try {
                  operation_date, start_time, end_time, procedure_performed, post_op_diagnosis,
                  anaesthesia_type, anaesthetist_name, scrub_nurse, circulating_nurse, assistant_surgeon,
                  blood_loss_ml, urine_output_ml, fluid_input_ml, complications, post_op_instructions,
-                 wound_classification, outcome, icu_required, created_by, created_at)
+                 wound_classification, outcome, icu_required,
+                 case_type_echs, case_type_ssf, case_type_mlc, case_type_other, case_type_other_text,
+                 created_by, created_at)
              VALUES
                 (:rn, :bid, :pid, :sid, :did, :rid,
                  :opdate, :stime, :etime, :proc, :postdiag,
                  :anaes, :anaesname, :scrub, :circ, :asst,
                  :blood, :urine, :fluid, :comp, :postinstr,
-                 :wound, :outcome, :icu, :uid, NOW())"
+                 :wound, :outcome, :icu,
+                 :echs, :ssf, :mlc, :ctother, :ctothertext,
+                 :uid, NOW())"
         );
         $stmt->execute([
-            ':rn'       => $recordNumber,
-            ':bid'      => $bookingId,
-            ':pid'      => $patientId,
-            ':sid'      => $surgeonId,
-            ':did'      => $departmentId,
-            ':rid'      => $otRoomId,
-            ':opdate'   => $operationDate,
-            ':stime'    => $startTime,
-            ':etime'    => $endTime,
-            ':proc'     => $procedurePerformed,
-            ':postdiag' => $postOpDiagnosis,
-            ':anaes'    => $anaesthesiaType,
-            ':anaesname'=> $anaesthetistName,
-            ':scrub'    => $scrubNurse,
-            ':circ'     => $circulatingNurse,
-            ':asst'     => $assistantSurgeon,
-            ':blood'    => $bloodLoss,
-            ':urine'    => $urineOutput,
-            ':fluid'    => $fluidInput,
-            ':comp'     => $complications,
-            ':postinstr'=> $postOpInstructions,
-            ':wound'    => $woundClass,
-            ':outcome'  => $outcome,
-            ':icu'      => $icuRequired,
-            ':uid'      => $_SESSION['user_id'],
+            ':rn'          => $recordNumber,
+            ':bid'         => $bookingId,
+            ':pid'         => $patientId,
+            ':sid'         => $surgeonId,
+            ':did'         => $departmentId,
+            ':rid'         => $otRoomId,
+            ':opdate'      => $operationDate,
+            ':stime'       => $startTime,
+            ':etime'       => $endTime,
+            ':proc'        => $procedurePerformed,
+            ':postdiag'    => $postOpDiagnosis,
+            ':anaes'       => $anaesthesiaType,
+            ':anaesname'   => $anaesthetistName,
+            ':scrub'       => $scrubNurse,
+            ':circ'        => $circulatingNurse,
+            ':asst'        => $assistantSurgeon,
+            ':blood'       => $bloodLoss,
+            ':urine'       => $urineOutput,
+            ':fluid'       => $fluidInput,
+            ':comp'        => $complications,
+            ':postinstr'   => $postOpInstructions,
+            ':wound'       => $woundClass,
+            ':outcome'     => $outcome,
+            ':icu'         => $icuRequired,
+            ':echs'        => $caseTypeEchs,
+            ':ssf'         => $caseTypeSsf,
+            ':mlc'         => $caseTypeMlc,
+            ':ctother'     => $caseTypeOther,
+            ':ctothertext' => $caseTypeOtherText,
+            ':uid'         => $_SESSION['user_id'],
         ]);
         $newId = (int)$pdo->lastInsertId();
 
@@ -155,21 +171,26 @@ try {
                 blood_loss_ml=:blood, urine_output_ml=:urine, fluid_input_ml=:fluid,
                 complications=:comp, post_op_instructions=:postinstr,
                 wound_classification=:wound, outcome=:outcome, icu_required=:icu,
+                case_type_echs=:echs, case_type_ssf=:ssf, case_type_mlc=:mlc,
+                case_type_other=:ctother, case_type_other_text=:ctothertext,
                 updated_at=NOW()
              WHERE id=:id"
         )->execute([
-            ':pid'      => $patientId,    ':sid'      => $surgeonId,
-            ':did'      => $departmentId, ':rid'      => $otRoomId,
-            ':opdate'   => $operationDate,':stime'    => $startTime,
-            ':etime'    => $endTime,      ':proc'     => $procedurePerformed,
-            ':postdiag' => $postOpDiagnosis, ':anaes' => $anaesthesiaType,
-            ':anaesname'=> $anaesthetistName, ':scrub' => $scrubNurse,
-            ':circ'     => $circulatingNurse, ':asst'  => $assistantSurgeon,
-            ':blood'    => $bloodLoss,    ':urine'    => $urineOutput,
-            ':fluid'    => $fluidInput,   ':comp'     => $complications,
-            ':postinstr'=> $postOpInstructions, ':wound' => $woundClass,
-            ':outcome'  => $outcome,      ':icu'      => $icuRequired,
-            ':id'       => $editId,
+            ':pid'         => $patientId,    ':sid'         => $surgeonId,
+            ':did'         => $departmentId, ':rid'         => $otRoomId,
+            ':opdate'      => $operationDate,':stime'       => $startTime,
+            ':etime'       => $endTime,      ':proc'        => $procedurePerformed,
+            ':postdiag'    => $postOpDiagnosis, ':anaes'    => $anaesthesiaType,
+            ':anaesname'   => $anaesthetistName, ':scrub'   => $scrubNurse,
+            ':circ'        => $circulatingNurse, ':asst'    => $assistantSurgeon,
+            ':blood'       => $bloodLoss,    ':urine'       => $urineOutput,
+            ':fluid'       => $fluidInput,   ':comp'        => $complications,
+            ':postinstr'   => $postOpInstructions, ':wound' => $woundClass,
+            ':outcome'     => $outcome,      ':icu'         => $icuRequired,
+            ':echs'        => $caseTypeEchs, ':ssf'         => $caseTypeSsf,
+            ':mlc'         => $caseTypeMlc,  ':ctother'     => $caseTypeOther,
+            ':ctothertext' => $caseTypeOtherText,
+            ':id'          => $editId,
         ]);
         $newId = $editId;
 

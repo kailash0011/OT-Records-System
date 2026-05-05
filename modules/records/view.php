@@ -143,6 +143,24 @@ require_once __DIR__ . '/../../includes/header.php';
                             <tr><th class="text-muted">Anaesthesia</th><td><?= sanitize($rec['anaesthesia_type'] ?? '—') ?></td></tr>
                             <tr><th class="text-muted">Procedure Performed</th><td><?= nl2br(sanitize($rec['procedure_performed'])) ?></td></tr>
                             <tr><th class="text-muted">Post-op Diagnosis</th><td><?= nl2br(sanitize($rec['post_op_diagnosis'] ?? '—')) ?></td></tr>
+                            <?php
+                            $caseTypes = [];
+                            if (!empty($rec['case_type_echs']))  $caseTypes[] = 'ECHS';
+                            if (!empty($rec['case_type_ssf']))   $caseTypes[] = 'SSF';
+                            if (!empty($rec['case_type_mlc']))   $caseTypes[] = 'MLC';
+                            if (!empty($rec['case_type_other'])) {
+                                $otherLabel = 'Other';
+                                if (!empty($rec['case_type_other_text'])) {
+                                    $otherLabel .= ' (' . sanitize($rec['case_type_other_text']) . ')';
+                                }
+                                $caseTypes[] = $otherLabel;
+                            }
+                            ?>
+                            <?php if ($caseTypes): ?>
+                            <tr><th class="text-muted">Case Type</th>
+                                <td><?php foreach ($caseTypes as $ct): ?><span class="badge bg-secondary me-1"><?= $ct ?></span><?php endforeach; ?></td>
+                            </tr>
+                            <?php endif; ?>
                         </table>
                     </div>
 

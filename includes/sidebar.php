@@ -103,21 +103,21 @@ function navGroupOpen(array $files): string {
         <li class="nav-item">
             <a href="#recordsMenu" data-bs-toggle="collapse"
                class="nav-link text-white d-flex justify-content-between align-items-center
-                      <?= navActive(['records_list.php','record_new.php']) ?>">
+                      <?= navActive(['records_list.php','record_new.php','index.php','add.php','view.php','edit.php']) ?>">
                 <span><i class="fas fa-file-medical me-2"></i> OT Records</span>
                 <i class="fas fa-chevron-down small"></i>
             </a>
-            <ul class="collapse nav flex-column ps-3 <?= navGroupOpen(['records_list.php','record_new.php']) ?>"
+            <ul class="collapse nav flex-column ps-3 <?= navGroupOpen(['records_list.php','record_new.php','index.php','add.php','view.php','edit.php']) ?>"
                 id="recordsMenu">
                 <li class="nav-item">
                     <a href="<?= BASE_URL ?>record_new.php"
-                       class="nav-link text-white <?= navActive('record_new.php') ?>">
+                       class="nav-link text-white <?= navActive(['record_new.php','add.php']) ?>">
                         <i class="fas fa-plus-circle me-2"></i> New Record
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="<?= BASE_URL ?>records_list.php"
-                       class="nav-link text-white <?= navActive('records_list.php') ?>">
+                       class="nav-link text-white <?= navActive(['records_list.php','index.php']) ?>">
                         <i class="fas fa-clipboard-list me-2"></i> Records List
                     </a>
                 </li>

@@ -1,6 +1,6 @@
 <?php
 /**
- * New OT Record Form (Tabbed)
+ * Edit OT Record Form (Tabbed)
  * OT Records Management System
  */
 require_once __DIR__ . '/../../config/constants.php';
@@ -9,33 +9,39 @@ require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
 requireLogin();
-if (!hasPermission('ot_records', 'create')) {
-    $_SESSION['flash_error'] = 'You do not have permission to create records.';
+if (!hasPermission('ot_records', 'edit')) {
+    $_SESSION['flash_error'] = 'You do not have permission to edit records.';
     header('Location: ' . BASE_URL . 'records_list.php');
     exit;
 }
 
-$pageTitle = 'New OT Record';
-$pdo       = getDBConnection();
+$id = (int)($_GET['id'] ?? 0);
+if (!$id) {
+    header('Location: ' . BASE_URL . 'records_list.php');
+    exit;
+}
+
+$pdo  = getDBConnection();
+$stmt = $pdo->prepare(
+    "SELECT r.*, p.full_name AS patient_name, p.patient_id AS patient_code
+     FROM ot_records r
+     JOIN patients p ON r.patient_id = p.id
+     WHERE r.id = :id LIMIT 1"
+);
+$stmt->execute([':id' => $id]);
+$rec = $stmt->fetch();
+
+if (!$rec) {
+    $_SESSION['flash_error'] = 'Record not found.';
+    header('Location: ' . BASE_URL . 'records_list.php');
+    exit;
+}
 
 $surgeons    = $pdo->query("SELECT id, full_name, department_id FROM surgeons WHERE is_active=1 ORDER BY full_name")->fetchAll();
 $departments = $pdo->query("SELECT id, name FROM departments WHERE is_active=1 ORDER BY name")->fetchAll();
 $otRooms     = $pdo->query("SELECT id, room_name, room_number FROM ot_rooms WHERE is_active=1 ORDER BY room_name")->fetchAll();
 
-// Pre-fill from booking if booking_id provided
-$bookingData = null;
-if (!empty($_GET['booking_id'])) {
-    $bid = (int)$_GET['booking_id'];
-    $bs  = $pdo->prepare(
-        "SELECT cb.*, p.full_name AS patient_name, p.patient_id AS patient_code
-         FROM case_bookings cb
-         JOIN patients p ON cb.patient_id = p.id
-         WHERE cb.id = :id LIMIT 1"
-    );
-    $bs->execute([':id' => $bid]);
-    $bookingData = $bs->fetch();
-}
-
+$pageTitle = 'Edit Record: ' . $rec['record_number'];
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 <div class="d-flex" id="wrapper">
@@ -43,9 +49,9 @@ require_once __DIR__ . '/../../includes/header.php';
 <div id="page-content-wrapper" class="flex-grow-1 overflow-auto">
 
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom px-3 py-2">
-        <span class="navbar-brand mb-0 h6 fw-bold"><i class="fas fa-file-medical-alt me-2 text-success"></i>New OT Record</span>
+        <span class="navbar-brand mb-0 h6 fw-bold"><i class="fas fa-edit me-2 text-warning"></i>Edit Record: <?= sanitize($rec['record_number']) ?></span>
         <div class="ms-auto">
-            <a href="<?= BASE_URL ?>records_list.php" class="btn btn-outline-secondary btn-sm">
+            <a href="<?= BASE_URL ?>modules/records/view.php?id=<?= $id ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="fas fa-arrow-left me-1"></i>Back
             </a>
         </div>
@@ -53,56 +59,14 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <div class="container-fluid p-4">
         <div class="card shadow-sm">
-            <div class="card-header bg-success text-white py-2">
-                <i class="fas fa-file-medical-alt me-2"></i>New Operative Record
+            <div class="card-header bg-warning text-dark py-2">
+                <i class="fas fa-edit me-2"></i>Edit Operative Record
             </div>
             <div class="card-body">
                 <form id="recordForm" novalidate>
                     <input type="hidden" name="csrf_token" value="<?= sanitize($_SESSION['csrf_token'] ?? '') ?>">
-                    <input type="hidden" name="booking_id" id="bookingIdHidden" value="<?= $bookingData ? (int)$bookingData['id'] : '' ?>">
-
-                    <!-- Booking Search / Auto-fill -->
-                    <div class="card border-info mb-3">
-                        <div class="card-header bg-info bg-opacity-10 py-2 d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold small"><i class="fas fa-search me-1 text-info"></i>Select from Existing Booking (optional)</span>
-                            <button type="button" class="btn btn-sm btn-outline-info" id="toggleBookingSearch">
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                        </div>
-                        <div id="bookingSearchPanel" class="card-body py-3 <?= $bookingData ? 'd-none' : '' ?>">
-                            <div class="row g-2 align-items-end">
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-1">Search by patient name, booking number or procedure</label>
-                                    <input type="text" id="bookingSearch" class="form-control"
-                                           placeholder="Type at least 2 characters…" autocomplete="off">
-                                    <div id="bookingDropdown" class="list-group position-absolute z-3"
-                                         style="min-width:420px;display:none;max-height:240px;overflow-y:auto;"></div>
-                                </div>
-                                <div class="col-md-4">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="clearBooking">
-                                        <i class="fas fa-times me-1"></i>Clear Booking
-                                    </button>
-                                </div>
-                            </div>
-                            <?php if ($bookingData): ?>
-                            <div id="bookingInfo" class="alert alert-success mt-2 py-2 small">
-                                <i class="fas fa-calendar-check me-1"></i>
-                                <strong><?= sanitize($bookingData['booking_number'] ?? '') ?></strong> &mdash;
-                                <?= sanitize($bookingData['patient_name']) ?> &mdash;
-                                <?= sanitize($bookingData['procedure_name']) ?>
-                            </div>
-                            <?php else: ?>
-                            <div id="bookingInfo" class="alert alert-success mt-2 py-2 small" style="display:none;"></div>
-                            <?php endif; ?>
-                        </div>
-                        <?php if ($bookingData): ?>
-                        <div id="bookingSelectedBadge" class="card-footer py-1 bg-success bg-opacity-10 small text-success">
-                            <i class="fas fa-check-circle me-1"></i>Booking <strong><?= sanitize($bookingData['booking_number'] ?? '') ?></strong> selected — fields auto-filled below.
-                        </div>
-                        <?php else: ?>
-                        <div id="bookingSelectedBadge" class="card-footer py-1 bg-success bg-opacity-10 small text-success" style="display:none;"></div>
-                        <?php endif; ?>
-                    </div>
+                    <input type="hidden" name="record_id" value="<?= $id ?>">
+                    <input type="hidden" name="booking_id" id="bookingIdHidden" value="<?= (int)($rec['booking_id'] ?? 0) ?>">
 
                     <!-- TABS -->
                     <ul class="nav nav-tabs mb-3" id="recordTabs">
@@ -122,18 +86,16 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <label class="form-label fw-semibold">Patient <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="text" id="patientSearch" class="form-control"
-                                               value="<?= $bookingData ? sanitize($bookingData['patient_name']) : '' ?>"
+                                               value="<?= sanitize($rec['patient_name']) ?>"
                                                placeholder="Search by name, ID or phone…" autocomplete="off">
                                         <button type="button" class="btn btn-outline-secondary" id="clearPatient"><i class="fas fa-times"></i></button>
                                     </div>
                                     <input type="hidden" name="patient_id" id="patientId"
-                                           value="<?= $bookingData ? (int)$bookingData['patient_id'] : '' ?>" required>
+                                           value="<?= (int)$rec['patient_id'] ?>" required>
                                     <div id="patientDropdown" class="list-group position-absolute z-3" style="min-width:350px;display:none;max-height:200px;overflow-y:auto;"></div>
-                                    <div id="patientInfo" class="alert alert-info mt-2 py-2 small" <?= $bookingData ? '' : 'style="display:none;"' ?>>
-                                        <?php if ($bookingData): ?>
+                                    <div id="patientInfo" class="alert alert-info mt-2 py-2 small">
                                         <i class="fas fa-user-check me-1"></i>
-                                        <strong><?= sanitize($bookingData['patient_name']) ?></strong> | <?= sanitize($bookingData['patient_code']) ?>
-                                        <?php endif; ?>
+                                        <strong><?= sanitize($rec['patient_name']) ?></strong> | <?= sanitize($rec['patient_code']) ?>
                                     </div>
                                 </div>
                                 <div class="col-md-3 mb-3">
@@ -142,7 +104,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                         <option value=""></option>
                                         <?php foreach ($surgeons as $s): ?>
                                         <option value="<?= $s['id'] ?>" data-dept="<?= $s['department_id'] ?>"
-                                            <?= $bookingData && $bookingData['surgeon_id'] == $s['id'] ? 'selected' : '' ?>>
+                                            <?= $rec['surgeon_id'] == $s['id'] ? 'selected' : '' ?>>
                                             <?= sanitize($s['full_name']) ?>
                                         </option>
                                         <?php endforeach; ?>
@@ -153,7 +115,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <select name="department_id" id="departmentId" class="form-select select2" required data-placeholder="Select…">
                                         <option value=""></option>
                                         <?php foreach ($departments as $d): ?>
-                                        <option value="<?= $d['id'] ?>" <?= $bookingData && $bookingData['department_id'] == $d['id'] ? 'selected' : '' ?>>
+                                        <option value="<?= $d['id'] ?>" <?= $rec['department_id'] == $d['id'] ? 'selected' : '' ?>>
                                             <?= sanitize($d['name']) ?>
                                         </option>
                                         <?php endforeach; ?>
@@ -164,7 +126,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <select name="ot_room_id" class="form-select select2" data-placeholder="Select room…">
                                         <option value=""></option>
                                         <?php foreach ($otRooms as $r): ?>
-                                        <option value="<?= $r['id'] ?>" <?= $bookingData && $bookingData['ot_room_id'] == $r['id'] ? 'selected' : '' ?>>
+                                        <option value="<?= $r['id'] ?>" <?= $rec['ot_room_id'] == $r['id'] ? 'selected' : '' ?>>
                                             <?= sanitize($r['room_name']) ?>
                                         </option>
                                         <?php endforeach; ?>
@@ -173,33 +135,34 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label fw-semibold">Operation Date <span class="text-danger">*</span></label>
                                     <input type="date" name="operation_date" class="form-control" required
-                                           value="<?= $bookingData ? sanitize($bookingData['scheduled_date']) : date('Y-m-d') ?>">
+                                           value="<?= sanitize($rec['operation_date']) ?>">
                                 </div>
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label fw-semibold">Start Time</label>
                                     <input type="text" name="start_time" class="form-control time-picker"
-                                           value="<?= $bookingData ? sanitize(substr($bookingData['scheduled_time'],0,5)) : '' ?>">
+                                           value="<?= sanitize(substr($rec['start_time'] ?? '', 0, 5)) ?>">
                                 </div>
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label fw-semibold">End Time</label>
-                                    <input type="text" name="end_time" class="form-control time-picker">
+                                    <input type="text" name="end_time" class="form-control time-picker"
+                                           value="<?= sanitize(substr($rec['end_time'] ?? '', 0, 5)) ?>">
                                 </div>
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label fw-semibold">Anaesthesia Type</label>
                                     <select name="anaesthesia_type" class="form-select">
                                         <?php foreach (['General','Spinal','Epidural','Local','Sedation'] as $a): ?>
-                                        <option value="<?= $a ?>" <?= $bookingData && $bookingData['anaesthesia_type'] === $a ? 'selected' : '' ?>><?= $a ?></option>
+                                        <option value="<?= $a ?>" <?= $rec['anaesthesia_type'] === $a ? 'selected' : '' ?>><?= $a ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label class="form-label fw-semibold">Procedure Performed <span class="text-danger">*</span></label>
                                     <textarea name="procedure_performed" class="form-control" rows="3" required
-                                              placeholder="Describe the procedure(s) performed…"><?= $bookingData ? sanitize($bookingData['procedure_name']) : '' ?></textarea>
+                                              placeholder="Describe the procedure(s) performed…"><?= sanitize($rec['procedure_performed']) ?></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label class="form-label fw-semibold">Post-op Diagnosis</label>
-                                    <textarea name="post_op_diagnosis" id="postOpDiagnosis" class="form-control" rows="2"><?= $bookingData ? sanitize($bookingData['pre_op_diagnosis'] ?? '') : '' ?></textarea>
+                                    <textarea name="post_op_diagnosis" id="postOpDiagnosis" class="form-control" rows="2"><?= sanitize($rec['post_op_diagnosis'] ?? '') ?></textarea>
                                 </div>
 
                                 <!-- Case Types -->
@@ -207,25 +170,30 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <label class="form-label fw-semibold">Case Type</label>
                                     <div class="d-flex flex-wrap gap-3">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="case_type_echs" id="ctEchs" value="1">
+                                            <input class="form-check-input" type="checkbox" name="case_type_echs" id="ctEchs" value="1"
+                                                   <?= !empty($rec['case_type_echs']) ? 'checked' : '' ?>>
                                             <label class="form-check-label" for="ctEchs">ECHS</label>
                                         </div>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="case_type_ssf" id="ctSsf" value="1">
+                                            <input class="form-check-input" type="checkbox" name="case_type_ssf" id="ctSsf" value="1"
+                                                   <?= !empty($rec['case_type_ssf']) ? 'checked' : '' ?>>
                                             <label class="form-check-label" for="ctSsf">SSF</label>
                                         </div>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="case_type_mlc" id="ctMlc" value="1">
+                                            <input class="form-check-input" type="checkbox" name="case_type_mlc" id="ctMlc" value="1"
+                                                   <?= !empty($rec['case_type_mlc']) ? 'checked' : '' ?>>
                                             <label class="form-check-label" for="ctMlc">MLC</label>
                                         </div>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="case_type_other" id="ctOther" value="1">
+                                            <input class="form-check-input" type="checkbox" name="case_type_other" id="ctOther" value="1"
+                                                   <?= !empty($rec['case_type_other']) ? 'checked' : '' ?>>
                                             <label class="form-check-label" for="ctOther">Other</label>
                                         </div>
                                     </div>
-                                    <div id="ctOtherSpecify" class="mt-2" style="display:none;">
+                                    <div id="ctOtherSpecify" class="mt-2" <?= empty($rec['case_type_other']) ? 'style="display:none;"' : '' ?>>
                                         <input type="text" name="case_type_other_text" class="form-control form-control-sm"
-                                               placeholder="Please specify…" maxlength="200">
+                                               placeholder="Please specify…" maxlength="200"
+                                               value="<?= sanitize($rec['case_type_other_text'] ?? '') ?>">
                                     </div>
                                 </div>
                             </div>
@@ -239,19 +207,23 @@ require_once __DIR__ . '/../../includes/header.php';
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Anaesthetist Name</label>
-                                    <input type="text" name="anaesthetist_name" class="form-control" placeholder="Dr. …">
+                                    <input type="text" name="anaesthetist_name" class="form-control"
+                                           value="<?= sanitize($rec['anaesthetist_name'] ?? '') ?>" placeholder="Dr. …">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Assistant Surgeon</label>
-                                    <input type="text" name="assistant_surgeon" class="form-control">
+                                    <input type="text" name="assistant_surgeon" class="form-control"
+                                           value="<?= sanitize($rec['assistant_surgeon'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Scrub Nurse</label>
-                                    <input type="text" name="scrub_nurse" class="form-control">
+                                    <input type="text" name="scrub_nurse" class="form-control"
+                                           value="<?= sanitize($rec['scrub_nurse'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-semibold">Circulating Nurse</label>
-                                    <input type="text" name="circulating_nurse" class="form-control">
+                                    <input type="text" name="circulating_nurse" class="form-control"
+                                           value="<?= sanitize($rec['circulating_nurse'] ?? '') ?>">
                                 </div>
                             </div>
                             <div class="d-flex justify-content-between mt-2">
@@ -265,34 +237,52 @@ require_once __DIR__ . '/../../includes/header.php';
                             <div class="row mb-3">
                                 <div class="col-md-4">
                                     <label class="form-label fw-semibold">Blood Loss (ml)</label>
-                                    <input type="number" name="blood_loss_ml" class="form-control" value="0" min="0">
+                                    <input type="number" name="blood_loss_ml" class="form-control" value="<?= (int)$rec['blood_loss_ml'] ?>" min="0">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-semibold">Urine Output (ml)</label>
-                                    <input type="number" name="urine_output_ml" class="form-control" value="0" min="0">
+                                    <input type="number" name="urine_output_ml" class="form-control" value="<?= (int)$rec['urine_output_ml'] ?>" min="0">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-semibold">Fluid Input (ml)</label>
-                                    <input type="number" name="fluid_input_ml" class="form-control" value="0" min="0">
+                                    <input type="number" name="fluid_input_ml" class="form-control" value="<?= (int)$rec['fluid_input_ml'] ?>" min="0">
                                 </div>
                             </div>
 
+                            <?php
+                            $existingTransfusions = $pdo->prepare("SELECT * FROM blood_transfusions WHERE record_id=:id");
+                            $existingTransfusions->execute([':id' => $id]);
+                            $existingTransfusions = $existingTransfusions->fetchAll();
+                            $hasBT = !empty($existingTransfusions);
+                            ?>
                             <h6 class="fw-bold mt-3">Blood Transfusion</h6>
                             <div class="mb-2">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <input type="radio" class="btn-check" name="has_blood_transfusion" id="btNo" value="0" checked>
+                                    <input type="radio" class="btn-check" name="has_blood_transfusion" id="btNo" value="0" <?= $hasBT ? '' : 'checked' ?>>
                                     <label class="btn btn-outline-secondary" for="btNo">No</label>
-                                    <input type="radio" class="btn-check" name="has_blood_transfusion" id="btYes" value="1">
+                                    <input type="radio" class="btn-check" name="has_blood_transfusion" id="btYes" value="1" <?= $hasBT ? 'checked' : '' ?>>
                                     <label class="btn btn-outline-primary" for="btYes">Yes</label>
                                 </div>
                             </div>
-                            <div id="transfusionSection" style="display:none;">
+                            <div id="transfusionSection" <?= $hasBT ? '' : 'style="display:none;"' ?>>
                             <div class="table-responsive">
                                 <table class="table table-sm table-bordered">
                                     <thead class="table-light">
                                         <tr><th>Blood Type</th><th>Units</th><th>Time</th><th>Reaction</th><th>Notes</th><th></th></tr>
                                     </thead>
-                                    <tbody id="transfusionRows"></tbody>
+                                    <tbody id="transfusionRows">
+                                    <?php foreach ($existingTransfusions as $t): ?>
+                                    <?php $ti = $t['id']; ?>
+                                    <tr>
+                                        <td><input type="text" name="transfusions[<?= $ti ?>][blood_type]" class="form-control form-control-sm" value="<?= sanitize($t['blood_type']) ?>"></td>
+                                        <td><input type="number" name="transfusions[<?= $ti ?>][units_transfused]" class="form-control form-control-sm" value="<?= sanitize($t['units_transfused'] ?? '') ?>" min="0" step="0.5"></td>
+                                        <td><input type="text" name="transfusions[<?= $ti ?>][transfusion_time]" class="form-control form-control-sm time-picker-dyn" value="<?= sanitize(substr($t['transfusion_time'] ?? '', 0, 5)) ?>"></td>
+                                        <td class="text-center"><input type="checkbox" name="transfusions[<?= $ti ?>][reaction]" value="1" <?= $t['reaction'] ? 'checked' : '' ?>></td>
+                                        <td><input type="text" name="transfusions[<?= $ti ?>][notes]" class="form-control form-control-sm" value="<?= sanitize($t['notes'] ?? '') ?>"></td>
+                                        <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
                                 </table>
                             </div>
                             <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="addTransfusion">
@@ -300,22 +290,41 @@ require_once __DIR__ . '/../../includes/header.php';
                             </button>
                             </div>
 
+                            <?php
+                            $existingCatheters = $pdo->prepare("SELECT * FROM catheters WHERE record_id=:id");
+                            $existingCatheters->execute([':id' => $id]);
+                            $existingCatheters = $existingCatheters->fetchAll();
+                            $hasCath = !empty($existingCatheters);
+                            ?>
                             <h6 class="fw-bold mt-2">Catheters / Lines</h6>
                             <div class="mb-2">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <input type="radio" class="btn-check" name="has_catheter" id="catNo" value="0" checked>
+                                    <input type="radio" class="btn-check" name="has_catheter" id="catNo" value="0" <?= $hasCath ? '' : 'checked' ?>>
                                     <label class="btn btn-outline-secondary" for="catNo">No</label>
-                                    <input type="radio" class="btn-check" name="has_catheter" id="catYes" value="1">
+                                    <input type="radio" class="btn-check" name="has_catheter" id="catYes" value="1" <?= $hasCath ? 'checked' : '' ?>>
                                     <label class="btn btn-outline-primary" for="catYes">Yes</label>
                                 </div>
                             </div>
-                            <div id="catheterSection" style="display:none;">
+                            <div id="catheterSection" <?= $hasCath ? '' : 'style="display:none;"' ?>>
                             <div class="table-responsive">
                                 <table class="table table-sm table-bordered">
                                     <thead class="table-light">
                                         <tr><th>Type</th><th>Size</th><th>Insertion</th><th>Removal</th><th>Site</th><th>Notes</th><th></th></tr>
                                     </thead>
-                                    <tbody id="catheterRows"></tbody>
+                                    <tbody id="catheterRows">
+                                    <?php foreach ($existingCatheters as $c): ?>
+                                    <?php $ci = $c['id']; ?>
+                                    <tr>
+                                        <td><input type="text" name="catheters[<?= $ci ?>][catheter_type]" class="form-control form-control-sm" value="<?= sanitize($c['catheter_type']) ?>"></td>
+                                        <td><input type="text" name="catheters[<?= $ci ?>][size]" class="form-control form-control-sm" value="<?= sanitize($c['size'] ?? '') ?>"></td>
+                                        <td><input type="text" name="catheters[<?= $ci ?>][insertion_time]" class="form-control form-control-sm time-picker-dyn" value="<?= sanitize(substr($c['insertion_time'] ?? '', 0, 5)) ?>"></td>
+                                        <td><input type="text" name="catheters[<?= $ci ?>][removal_time]" class="form-control form-control-sm time-picker-dyn" value="<?= sanitize(substr($c['removal_time'] ?? '', 0, 5)) ?>"></td>
+                                        <td><input type="text" name="catheters[<?= $ci ?>][site]" class="form-control form-control-sm" value="<?= sanitize($c['site'] ?? '') ?>"></td>
+                                        <td><input type="text" name="catheters[<?= $ci ?>][notes]" class="form-control form-control-sm" value="<?= sanitize($c['notes'] ?? '') ?>"></td>
+                                        <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
                                 </table>
                             </div>
                             <button type="button" class="btn btn-outline-primary btn-sm" id="addCatheter">
@@ -330,23 +339,45 @@ require_once __DIR__ . '/../../includes/header.php';
                         </div>
 
                         <!-- TAB 4: Specimens/Implants -->
+                        <?php
+                        $existingSpecimens = $pdo->prepare("SELECT * FROM specimens WHERE record_id=:id");
+                        $existingSpecimens->execute([':id' => $id]);
+                        $existingSpecimens = $existingSpecimens->fetchAll();
+                        $hasSpec = !empty($existingSpecimens);
+
+                        $existingImplants = $pdo->prepare("SELECT * FROM implants WHERE record_id=:id");
+                        $existingImplants->execute([':id' => $id]);
+                        $existingImplants = $existingImplants->fetchAll();
+                        ?>
                         <div class="tab-pane fade" id="tab4">
                             <h6 class="fw-bold">Specimens Sent to Lab</h6>
                             <div class="mb-2">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <input type="radio" class="btn-check" name="has_specimen" id="spNo" value="0" checked>
+                                    <input type="radio" class="btn-check" name="has_specimen" id="spNo" value="0" <?= $hasSpec ? '' : 'checked' ?>>
                                     <label class="btn btn-outline-secondary" for="spNo">No</label>
-                                    <input type="radio" class="btn-check" name="has_specimen" id="spYes" value="1">
+                                    <input type="radio" class="btn-check" name="has_specimen" id="spYes" value="1" <?= $hasSpec ? 'checked' : '' ?>>
                                     <label class="btn btn-outline-primary" for="spYes">Yes</label>
                                 </div>
                             </div>
-                            <div id="specimenSection" style="display:none;">
+                            <div id="specimenSection" <?= $hasSpec ? '' : 'style="display:none;"' ?>>
                             <div class="table-responsive">
                                 <table class="table table-sm table-bordered">
                                     <thead class="table-light">
                                         <tr><th>Type</th><th>Site</th><th>Sent to Lab</th><th>Lab Ref</th><th>Notes</th><th></th></tr>
                                     </thead>
-                                    <tbody id="specimenRows"></tbody>
+                                    <tbody id="specimenRows">
+                                    <?php foreach ($existingSpecimens as $s): ?>
+                                    <?php $si = $s['id']; ?>
+                                    <tr>
+                                        <td><input type="text" name="specimens[<?= $si ?>][specimen_type]" class="form-control form-control-sm" value="<?= sanitize($s['specimen_type']) ?>"></td>
+                                        <td><input type="text" name="specimens[<?= $si ?>][specimen_site]" class="form-control form-control-sm" value="<?= sanitize($s['specimen_site'] ?? '') ?>"></td>
+                                        <td class="text-center"><input type="checkbox" name="specimens[<?= $si ?>][sent_to_lab]" value="1" <?= $s['sent_to_lab'] ? 'checked' : '' ?>></td>
+                                        <td><input type="text" name="specimens[<?= $si ?>][lab_reference]" class="form-control form-control-sm" value="<?= sanitize($s['lab_reference'] ?? '') ?>"></td>
+                                        <td><input type="text" name="specimens[<?= $si ?>][notes]" class="form-control form-control-sm" value="<?= sanitize($s['notes'] ?? '') ?>"></td>
+                                        <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
                                 </table>
                             </div>
                             <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="addSpecimen">
@@ -360,7 +391,20 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <thead class="table-light">
                                         <tr><th>Name</th><th>Brand</th><th>Serial #</th><th>Lot #</th><th>Expiry</th><th>Notes</th><th></th></tr>
                                     </thead>
-                                    <tbody id="implantRows"></tbody>
+                                    <tbody id="implantRows">
+                                    <?php foreach ($existingImplants as $imp): ?>
+                                    <?php $ii = $imp['id']; ?>
+                                    <tr>
+                                        <td><input type="text" name="implants[<?= $ii ?>][implant_name]" class="form-control form-control-sm" value="<?= sanitize($imp['implant_name']) ?>"></td>
+                                        <td><input type="text" name="implants[<?= $ii ?>][brand]" class="form-control form-control-sm" value="<?= sanitize($imp['brand'] ?? '') ?>"></td>
+                                        <td><input type="text" name="implants[<?= $ii ?>][serial_number]" class="form-control form-control-sm" value="<?= sanitize($imp['serial_number'] ?? '') ?>"></td>
+                                        <td><input type="text" name="implants[<?= $ii ?>][lot_number]" class="form-control form-control-sm" value="<?= sanitize($imp['lot_number'] ?? '') ?>"></td>
+                                        <td><input type="date" name="implants[<?= $ii ?>][expiry_date]" class="form-control form-control-sm" value="<?= sanitize($imp['expiry_date'] ?? '') ?>"></td>
+                                        <td><input type="text" name="implants[<?= $ii ?>][notes]" class="form-control form-control-sm" value="<?= sanitize($imp['notes'] ?? '') ?>"></td>
+                                        <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
                                 </table>
                             </div>
                             <button type="button" class="btn btn-outline-primary btn-sm" id="addImplant">
@@ -379,48 +423,44 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label fw-semibold">Wound Classification</label>
                                     <select name="wound_classification" class="form-select">
-                                        <option value="Clean">Clean</option>
-                                        <option value="Clean-Contaminated">Clean-Contaminated</option>
-                                        <option value="Contaminated">Contaminated</option>
-                                        <option value="Dirty">Dirty</option>
+                                        <?php foreach (['Clean','Clean-Contaminated','Contaminated','Dirty'] as $wc): ?>
+                                        <option value="<?= $wc ?>" <?= $rec['wound_classification'] === $wc ? 'selected' : '' ?>><?= $wc ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label fw-semibold">Outcome</label>
                                     <select name="outcome" class="form-select">
-                                        <option value="Satisfactory">Satisfactory</option>
-                                        <option value="Guarded">Guarded</option>
-                                        <option value="Critical">Critical</option>
-                                        <option value="Deceased">Deceased</option>
+                                        <?php foreach (['Satisfactory','Guarded','Critical','Deceased'] as $oc): ?>
+                                        <option value="<?= $oc ?>" <?= $rec['outcome'] === $oc ? 'selected' : '' ?>><?= $oc ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label fw-semibold d-block">ICU Required</label>
                                     <div class="form-check form-switch mt-2">
-                                        <input class="form-check-input" type="checkbox" name="icu_required" id="icuRequired" value="1">
+                                        <input class="form-check-input" type="checkbox" name="icu_required" id="icuRequired" value="1"
+                                               <?= $rec['icu_required'] ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="icuRequired">Yes, transfer to ICU</label>
                                     </div>
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label class="form-label fw-semibold">Complications</label>
                                     <textarea name="complications" class="form-control" rows="3"
-                                              placeholder="Describe any intraoperative or immediate post-op complications…"></textarea>
+                                              placeholder="Describe any intraoperative or immediate post-op complications…"><?= sanitize($rec['complications'] ?? '') ?></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
                                     <label class="form-label fw-semibold">Post-op Instructions</label>
                                     <textarea name="post_op_instructions" class="form-control" rows="3"
-                                              placeholder="Pain management, diet, wound care, follow-up…"></textarea>
+                                              placeholder="Pain management, diet, wound care, follow-up…"><?= sanitize($rec['post_op_instructions'] ?? '') ?></textarea>
                                 </div>
                             </div>
                             <div class="d-flex justify-content-between mt-2 border-top pt-3">
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="goTab4Back"><i class="fas fa-arrow-left me-1"></i>Back</button>
                                 <div class="d-flex gap-2">
-                                    <a href="<?= BASE_URL ?>records_list.php" class="btn btn-secondary btn-sm">Cancel</a>
-                                    <button type="submit" name="action" value="save" class="btn btn-success">
-                                        <i class="fas fa-save me-1"></i>Save Record
-                                    </button>
-                                    <button type="submit" name="action" value="save_print" class="btn btn-outline-success">
-                                        <i class="fas fa-print me-1"></i>Save &amp; Print
+                                    <a href="<?= BASE_URL ?>modules/records/view.php?id=<?= $id ?>" class="btn btn-secondary btn-sm">Cancel</a>
+                                    <button type="submit" name="action" value="save" class="btn btn-warning">
+                                        <i class="fas fa-save me-1"></i>Update Record
                                     </button>
                                 </div>
                             </div>
@@ -435,10 +475,8 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <script>
-const SAVE_URL        = '<?= BASE_URL ?>modules/records/save.php';
-const SEARCH_URL      = '<?= BASE_URL ?>api/search_patient.php';
-const BOOKING_SEARCH  = '<?= BASE_URL ?>api/search_booking.php';
-const PRINT_BASE      = '<?= BASE_URL ?>modules/records/print.php';
+const SAVE_URL   = '<?= BASE_URL ?>modules/records/save.php';
+const SEARCH_URL = '<?= BASE_URL ?>api/search_patient.php';
 
 function switchTab(targetId) {
     const el = document.querySelector('a[href="' + targetId + '"]');
@@ -464,109 +502,13 @@ $(document).ready(function () {
     $('#goTab3Back').on('click', function(){ switchTab('#tab3'); });
     $('#goTab4Back').on('click', function(){ switchTab('#tab4'); });
 
-    // Toggle booking search panel
-    $('#toggleBookingSearch').on('click', function () {
-        $('#bookingSearchPanel').toggleClass('d-none');
-    });
-
-    // Booking search
-    let bookingTimer;
-    $('#bookingSearch').on('input', function () {
-        clearTimeout(bookingTimer);
-        const q = $(this).val().trim();
-        if (q.length < 2) { $('#bookingDropdown').hide(); return; }
-        bookingTimer = setTimeout(function () {
-            $.getJSON(BOOKING_SEARCH, {q: q}, function (data) {
-                const dd = $('#bookingDropdown').empty().show();
-                if (!data.length) {
-                    dd.append('<a class="list-group-item small text-muted">No bookings found.</a>');
-                    return;
-                }
-                data.forEach(function (b) {
-                    const label = $('<div>').text(b.booking_number).html() + ' &mdash; ' +
-                        $('<div>').text(b.patient_name).html() + ' &mdash; ' +
-                        $('<div>').text(b.procedure_name).html() +
-                        ' <span class="text-muted">(' + $('<div>').text(b.scheduled_date).html() + ')</span>';
-                    dd.append($('<a class="list-group-item list-group-item-action small"></a>')
-                        .html(label)
-                        .on('click', function () {
-                            applyBooking(b);
-                            $('#bookingDropdown').hide();
-                            $('#bookingSearch').val('');
-                        }));
-                });
-            });
-        }, 300);
-    });
-
-    function applyBooking(b) {
-        // Set booking id
-        $('#bookingIdHidden').val(b.id);
-        // Patient
-        $('#patientSearch').val(b.patient_name);
-        $('#patientId').val(b.patient_id);
-        $('#patientInfo').html(
-            '<i class="fas fa-user-check me-1"></i>' +
-            '<strong>' + $('<div>').text(b.patient_name).html() + '</strong> | ' +
-            $('<div>').text(b.patient_code).html()
-        ).show();
-        // Surgeon
-        const surgeonOpt = $('#surgeonId option[value="' + b.surgeon_id + '"]');
-        if (surgeonOpt.length) {
-            $('#surgeonId').val(b.surgeon_id).trigger('change.select2');
-        }
-        // Department
-        const deptOpt = $('#departmentId option[value="' + b.department_id + '"]');
-        if (deptOpt.length) {
-            $('#departmentId').val(b.department_id).trigger('change.select2');
-        }
-        // Procedure
-        $('textarea[name="procedure_performed"]').val(b.procedure_name);
-        // Diagnosis
-        $('#postOpDiagnosis').val(b.pre_op_diagnosis || '');
-        // Operation date & time
-        if (b.scheduled_date) $('input[name="operation_date"]').val(b.scheduled_date);
-        if (b.scheduled_time) $('input[name="start_time"]').val(b.scheduled_time.substring(0,5));
-        // Anaesthesia
-        if (b.anaesthesia_type) $('select[name="anaesthesia_type"]').val(b.anaesthesia_type);
-
-        // Update booking badge
-        $('#bookingInfo').html(
-            '<i class="fas fa-calendar-check me-1"></i>' +
-            '<strong>' + $('<div>').text(b.booking_number).html() + '</strong> &mdash; ' +
-            $('<div>').text(b.patient_name).html() + ' &mdash; ' +
-            $('<div>').text(b.procedure_name).html()
-        ).show();
-        $('#bookingSelectedBadge').html(
-            '<i class="fas fa-check-circle me-1"></i>Booking <strong>' +
-            $('<div>').text(b.booking_number).html() +
-            '</strong> selected — fields auto-filled below.'
-        ).show();
-        // Collapse the panel
-        $('#bookingSearchPanel').addClass('d-none');
-    }
-
-    $('#clearBooking').on('click', function () {
-        $('#bookingIdHidden').val('');
-        $('#bookingInfo').hide();
-        $('#bookingSelectedBadge').hide();
-        $('#bookingSearch').val('');
-        $('#bookingDropdown').hide();
-    });
-
-    $(document).on('click', function (e) {
-        if (!$(e.target).closest('#bookingSearch, #bookingDropdown').length) {
-            $('#bookingDropdown').hide();
-        }
-    });
-
     // Case type Other checkbox → show/hide specify field
     $('#ctOther').on('change', function () {
         $('#ctOtherSpecify').toggle(this.checked);
         if (!this.checked) $('#ctOtherSpecify input').val('');
     });
 
-    // Conditional sections: Blood Transfusion / Catheter / Specimen
+    // Conditional sections
     $('input[name="has_blood_transfusion"]').on('change', function () {
         $('#transfusionSection').toggle(this.value === '1' && this.checked);
     });
@@ -667,16 +609,14 @@ $(document).ready(function () {
     // Form submit
     $('#recordForm').on('submit', function (e) {
         e.preventDefault();
-        const printAfter = $(document.activeElement).val() === 'save_print';
         if (!$('#patientId').val()) { Swal.fire('Validation', 'Please select a patient.', 'warning'); switchTab('#tab1'); return; }
         if (!this.checkValidity()) { this.classList.add('was-validated'); switchTab('#tab1'); return; }
         const btn = $(this).find('[type=submit]').prop('disabled', true);
 
         $.post(SAVE_URL, $(this).serialize(), function (res) {
             if (res.success) {
-                Swal.fire({icon: 'success', title: 'Saved', text: res.message}).then(function () {
-                    if (printAfter) window.open(PRINT_BASE + '?id=' + res.record_id, '_blank');
-                    window.location.href = '<?= BASE_URL ?>records_list.php';
+                Swal.fire({icon: 'success', title: 'Updated', text: res.message}).then(function () {
+                    window.location.href = '<?= BASE_URL ?>modules/records/view.php?id=<?= $id ?>';
                 });
             } else {
                 Swal.fire('Error', res.message, 'error');
